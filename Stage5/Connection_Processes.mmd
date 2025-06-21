@@ -1,0 +1,11 @@
+sequenceDiagram
+    participant Client as React Client
+    participant Spring as Spring Boot
+    participant DB as Database
+
+    Client->>Spring: Login Request
+    Spring->>DB: Verify Credentials
+    DB-->>Spring: User Details & Roles
+    Spring->>Spring: Generate JWT
+    Spring-->>Client: Return JWT & Refresh
+    Note over Client: Store tokens

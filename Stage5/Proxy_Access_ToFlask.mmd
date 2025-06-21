@@ -1,0 +1,15 @@
+sequenceDiagram
+    participant Client as React Client
+    participant Spring as Spring Boot
+    participant Flask as Flask Server
+
+    Client->>Spring: API Request with JWT
+    Spring->>Spring: Validate JWT
+    alt Valid JWT
+        Spring->>Flask: Forward Request
+        Flask->>Flask: Validate Token
+        Flask-->>Spring: Return Data
+        Spring-->>Client: Forward Response
+    else Invalid JWT
+        Spring-->>Client: 401 Unauthorized
+    end

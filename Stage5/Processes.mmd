@@ -1,0 +1,37 @@
+flowchart TD
+    %% תהליך התחברות
+    A["Client"] -->|"1. Login Request"| B["Spring Boot"]
+    B -->|"2. Verify Credentials"| C[("Database")]
+    B -->|"3. Generate JWT"| D["Create Tokens"]
+    D -->|"4. JWT + Refresh Token"| A
+
+    %% גישה ישירה
+    A -->|"5a. API Request + JWT"| E["Flask Server"]
+    E -->|"6a. Validate JWT"| E
+    E -->|"7a. Return Data"| A
+
+    %% גישה דרך פרוקסי
+    A -->|"5b. API Request + JWT"| B
+    B -->|"6b. Validate JWT"| B
+    B -->|"7b. Forward Request"| E
+    E -->|"8b. Process & Return"| B
+    B -->|"9b. Return Data"| A
+
+    %% רענון טוקן
+    A -->|"Token Expired"| F["Refresh Request"]
+    F -->|"Refresh Token"| B
+    B -->|"Validate Refresh"| B
+    B -->|"New JWT"| A
+
+    %% עיצוב צמתים
+    classDef client fill:#61DAFB,stroke:#333,stroke-width:1px
+    classDef spring fill:#6DB33F,stroke:#333,stroke-width:1px,color:white
+    classDef flask fill:#000000,stroke:#333,stroke-width:1px,color:white
+    classDef db fill:#F8DC75,stroke:#333,stroke-width:1px
+
+    class A client
+    class B spring
+    class E flask
+    class C db
+    class D spring
+    class F client

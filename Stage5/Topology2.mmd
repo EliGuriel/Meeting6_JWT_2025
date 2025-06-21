@@ -1,0 +1,31 @@
+graph TB
+%% הגדרת צבעים
+    classDef reactClient fill:#61DAFB,stroke:#333,stroke-width:2px,color:black
+    classDef springServer fill:#6DB33F,stroke:#333,stroke-width:2px,color:white
+    classDef flaskServer fill:#000000,stroke:#333,stroke-width:2px,color:white
+    classDef database fill:#F8DC75,stroke:#333,stroke-width:2px,color:black
+
+%% הגדרת הצמתים בתתי-גרפים לקביעת מיקום אנכי
+    subgraph Top
+        ReactClient["React Client"]:::reactClient
+    end
+
+    subgraph Middle
+        SpringServer["Spring Boot Server"]:::springServer
+    end
+
+    subgraph BottomLeft
+        FlaskServer["Flask Server"]:::flaskServer
+    end
+
+    subgraph BottomRight
+        DB[("MySQL Database")]:::database
+    end
+
+%% קישורים בין הצמתים
+    ReactClient --"1. Login Request"--> SpringServer
+    SpringServer --"2. JWT + Refresh Token"--> ReactClient
+ReactClient --"3a. Direct API Call with JWT"--> FlaskServer
+ReactClient --"3b. API Call with JWT"--> SpringServer
+SpringServer --"4. Proxy Request with Internal Token"--> FlaskServer
+SpringServer --"5. User Authentication & DB Operations"--> DB

@@ -1,0 +1,455 @@
+### Stage 3 JWT with Refresh Tokens API Tests - COPY-PASTE VERSION
+### Save this file as: stage3-jwt-refresh-tests.http
+### Use with IntelliJ IDEA Ultimate HTTP Client
+
+### NEW IN STAGE 3: Dual Token System (Access Token + Refresh Token)
+### - Access Token: 5 minutes (for API calls)
+### - Refresh Token: 10 minutes (for getting new tokens)
+
+### INSTRUCTIONS:
+### 1. Run login request below
+### 2. Copy BOTH accessToken AND refreshToken from response
+### 3. Use accessToken for protected endpoints
+### 4. Use refreshToken when accessToken expires
+
+### Variables
+@baseUrl = http://localhost:8080
+@contentType = application/json
+
+### ===================================
+### STEP 1: LOGIN TO GET DUAL TOKENS
+### ===================================
+
+### 1.1 Login as Admin - GET BOTH TOKENS
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "admin",
+"password": "admin"
+}
+
+### Response will include BOTH tokens:
+### {
+###   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+###   "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+### }
+### COPY BOTH TOKENS FOR USE BELOW
+
+###
+
+### 1.2 Login as User - GET BOTH TOKENS
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "user",
+"password": "user"
+}
+
+### COPY BOTH TOKENS FROM RESPONSE ABOVE FOR USER TESTS
+
+### ===================================
+### STEP 2: USE ACCESS TOKEN (5 MIN VALIDITY)
+### ===================================
+
+### 2.1 Test Protected Endpoint with Access Token
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK with "welcome to the home page"
+
+###
+
+### 2.2 Test Protected Endpoint with Refresh Token (Should Fail)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_REFRESH_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized (Refresh tokens are not for API calls)
+
+###
+
+### 2.3 Test Protected Endpoint without Token
+GET {{baseUrl}}/api/protected-message
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized
+
+### ===================================
+### STEP 3: REFRESH TOKEN FLOW
+### ===================================
+
+### 3.1 Get New Tokens Using Refresh Token
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "PASTE_REFRESH_TOKEN_HERE"
+}
+
+### Expected: 200 OK with new accessToken AND new refreshToken
+### Response:
+### {
+###   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",    (NEW 5-minute token)
+###   "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."     (NEW 10-minute token)
+### }
+### COPY THE NEW TOKENS FOR CONTINUED USE
+
+###
+
+### 3.2 Use New Access Token from Refresh
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_NEW_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK (proving refresh worked)
+
+###
+
+### 3.3 Test Refresh with Invalid Token
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "invalid.refresh.token.here"
+}
+
+### Expected: 500 Internal Server Error or 401 Unauthorized
+
+###
+
+### 3.4 Test Refresh with Access Token (Wrong Token Type)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "PASTE_ACCESS_TOKEN_HERE"
+}
+
+### Expected: Should work (both tokens have same structure in this implementation)
+### Note: In production, refresh tokens should have different claims
+
+### ===================================
+### STEP 4: TOKEN EXPIRATION TESTING
+### ===================================
+
+### 4.1 Generate Tokens for Expiration Test
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "admin",
+"password": "admin"
+}
+
+### Copy tokens and wait 5+ minutes, then test below:
+
+###
+
+### 4.2 Test Expired Access Token (Wait 5+ minutes)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_OLD_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected after 5+ minutes: 401 Unauthorized or 500 Internal Server Error
+
+###
+
+### 4.3 Test Refresh with Expired Refresh Token (Wait 10+ minutes)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "PASTE_OLD_REFRESH_TOKEN_HERE"
+}
+
+### Expected after 10+ minutes: 401 Unauthorized "Please login again"
+
+### ===================================
+### STEP 5: LOGIN FAILURE TESTS
+### ===================================
+
+### 5.1 Invalid Password
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "admin",
+"password": "wrongpassword"
+}
+
+### Expected: 401 Unauthorized
+
+###
+
+### 5.2 Non-existent User
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "nonexistent",
+"password": "password"
+}
+
+### Expected: 401 Unauthorized
+
+###
+
+### 5.3 Empty Credentials
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "",
+"password": ""
+}
+
+### Expected: 401 Unauthorized
+
+### ===================================
+### STEP 6: REFRESH TOKEN EDGE CASES
+### ===================================
+
+### 6.1 Empty Refresh Token
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": ""
+}
+
+### Expected: 500 Internal Server Error
+
+###
+
+### 6.2 Missing Refresh Token Field
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+}
+
+### Expected: 400 Bad Request or 500 Internal Server Error
+
+###
+
+### 6.3 Malformed JSON
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "valid.token",
+}
+
+### Expected: 400 Bad Request
+
+### ===================================
+### STEP 7: SECURITY TESTS
+### ===================================
+
+### 7.1 SQL Injection in Login
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "admin'; DROP TABLE users; --",
+"password": "admin"
+}
+
+### Expected: 401 Unauthorized
+
+###
+
+### 7.2 XSS in Login
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "<script>alert('xss')</script>",
+"password": "admin"
+}
+
+### Expected: 401 Unauthorized
+
+###
+
+### 7.3 SQL Injection in Refresh Token
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "'; DROP TABLE users; --"
+}
+
+### Expected: 500 Internal Server Error (invalid token format)
+
+### ===================================
+### STEP 8: WORKFLOW DEMONSTRATION
+### ===================================
+
+### 8.1 Complete Workflow - Initial Login
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+"username": "admin",
+"password": "admin"
+}
+
+### Step 1: Copy both tokens from response
+### accessToken: use for API calls
+### refreshToken: save for later refresh
+
+###
+
+### 8.2 Complete Workflow - Use Access Token
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_FROM_8.1_HERE
+Content-Type: {{contentType}}
+
+### Step 2: Should get 200 OK with protected content
+
+###
+
+### 8.3 Complete Workflow - Simulate Token Expiry and Refresh
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+"refreshToken": "PASTE_REFRESH_TOKEN_FROM_8.1_HERE"
+}
+
+### Step 3: Get new tokens, copy both from response
+
+###
+
+### 8.4 Complete Workflow - Continue with New Access Token
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_NEW_ACCESS_TOKEN_FROM_8.3_HERE
+Content-Type: {{contentType}}
+
+### Step 4: Should work with new token, proving refresh cycle works
+
+### ===================================
+### STEP 9: CORS TESTS
+### ===================================
+
+### 9.1 CORS Preflight for Login
+OPTIONS {{baseUrl}}/api/login
+Origin: http://localhost:5173
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type
+
+###
+
+### 9.2 CORS Preflight for Refresh
+OPTIONS {{baseUrl}}/api/refresh_token
+Origin: http://localhost:5173
+Access-Control-Request-Method: POST
+Access-Control-Request-Headers: Content-Type
+
+###
+
+### 9.3 CORS Preflight for Protected Endpoint
+OPTIONS {{baseUrl}}/api/protected-message
+Origin: http://localhost:5173
+Access-Control-Request-Method: GET
+Access-Control-Request-Headers: Authorization
+
+### ===================================
+### STEP 10: REAL EXAMPLE TOKENS
+### ===================================
+
+### 10.1 Example Login Response Format
+### After running login, you'll get response like this:
+### {
+###   "accessToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY3MDM0NTYwMCwiZXhwIjoxNjcwMzQ1OTAwLCJyb2xlcyI6WyJST0xFX0FETUlOIl0sImlzc3VlZEJ5IjoibGVhcm5pbmcgSldUIHdpdGggU3ByaW5nIFNlY3VyaXR5In0.signature1",
+###   "refreshToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTY3MDM0NTYwMCwiZXhwIjoxNjcwMzQ2MjAwLCJpc3N1ZWRCeSI6ImxlYXJuaW5nIEpXVCB3aXRoIFNwcmluZyBTZWN1cml0eSJ9.signature2"
+### }
+
+### 10.2 Example Usage Pattern
+### 1. Use accessToken for all API calls
+### 2. When API returns 401, use refreshToken to get new tokens
+### 3. Replace old tokens with new tokens
+### 4. Repeat until refreshToken expires (10 min)
+### 5. Then user must login again
+
+### ===================================
+### EXPECTED RESULTS SUMMARY
+### ===================================
+###
+### LOGIN (/api/login):
+### - Valid credentials: 200 OK with accessToken AND refreshToken
+### - Invalid credentials: 401 Unauthorized
+### - Missing fields: 400 Bad Request or 401 Unauthorized
+###
+### PROTECTED ENDPOINT (/api/protected-message):
+### - With valid accessToken: 200 OK + "welcome to the home page"
+### - With refreshToken: 401 Unauthorized (wrong token type for API)
+### - Without token: 401 Unauthorized
+### - With expired accessToken: 401 Unauthorized or 500 Internal Server Error
+###
+### REFRESH TOKEN (/api/refresh_token):
+### - With valid refreshToken: 200 OK with NEW accessToken AND refreshToken
+### - With expired refreshToken: 401 Unauthorized "Please login again"
+### - With invalid refreshToken: 500 Internal Server Error
+### - With accessToken: Should work (same structure as refreshToken)
+###
+### TOKEN CHARACTERISTICS:
+### - Access Token: 5 minutes validity, for API calls
+### - Refresh Token: 10 minutes validity, for token renewal only
+### - Both tokens: JWT format with HS256 algorithm
+### - Token rotation: Each refresh gives completely new tokens
+###
+### SECURITY FEATURES:
+### - CORS enabled for localhost:5173
+### - SQL injection protection via JPA
+### - XSS protection via input validation
+### - Token expiration enforcement
+### - Separate token types with different purposes
+###
+### ===================================
+### TROUBLESHOOTING GUIDE
+### ===================================
+###
+### COMMON ISSUES:
+### 1. Using refreshToken for API calls - WON'T WORK
+###    Solution: Use accessToken for API, refreshToken only for /api/refresh_token
+###
+### 2. Tokens expire quickly - BY DESIGN
+###    Access Token: 5 minutes, Refresh Token: 10 minutes
+###    Solution: Implement automatic refresh in your client
+###
+### 3. Getting 500 errors on token operations - JWT PROCESSING ERROR
+###    Check server logs for specific JWT validation errors
+###    Common causes: malformed tokens, signature mismatch, expired tokens
+###
+### 4. Refresh token doesn't work - CHECK TOKEN TYPE
+###    Make sure you're using the refreshToken, not accessToken
+###    Both look similar but have different expiration times
+###
+### 5. CORS errors - FRONTEND INTEGRATION
+###    Make sure requests come from http://localhost:5173
+###    Check that frontend sends proper headers
+###
+### DEBUGGING TIPS:
+### 1. Decode tokens at https://jwt.io to inspect contents
+### 2. Check server console for detailed error messages
+### 3. Verify token expiration times in JWT payload
+### 4. Test token refresh cycle step by step
+### 5. Monitor network requests in browser dev tools
+###
+### TOKEN ROTATION BEST PRACTICES:
+### 1. Always replace both tokens after refresh
+### 2. Store tokens securely (avoid localStorage in production)
+### 3. Implement automatic refresh before token expires
+### 4. Handle refresh failures gracefully (redirect to login)
+### 5. Clear tokens on logout
+###
+### STAGE 3 vs STAGE 2 COMPARISON:
+### Stage 2: Single token, 5-minute sessions, frequent re-auth
+### Stage 3: Dual tokens, up to 10-minute sessions, seamless refresh
+### Better UX: Users stay logged in longer with automatic refresh
+### Better Security: Short-lived access tokens, token rotation

@@ -1,0 +1,509 @@
+### Stage 4 Improved - Stateless JWT with IP Claims API Tests
+### Save this file as: stage4-improved-stateless-tests.http
+### Use with IntelliJ IDEA Ultimate HTTP Client
+
+### IMPROVED IN STAGE 4: Stateless IP Validation
+### - IP address embedded directly in JWT tokens as claims
+### - No database storage for refresh tokens
+### - Fully stateless architecture
+### - Enhanced performance and scalability
+### - Token Blacklist System (in-memory ConcurrentHashMap)
+### - Complete Logout Functionality with token invalidation
+
+### INSTRUCTIONS:
+### 1. Run login request below
+### 2. Copy BOTH accessToken AND refreshToken from response
+### 3. Use accessToken for protected endpoints
+### 4. Use refreshToken when accessToken expires
+### 5. Test IP validation and logout functionality
+
+### Variables
+@baseUrl = http://localhost:8080
+@contentType = application/json
+
+### ===================================
+### STEP 1: LOGIN WITH IP CLAIMS EMBEDDED
+### ===================================
+
+### 1.1 Login as Admin - GET TOKENS WITH EMBEDDED IP
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Response includes tokens with IP embedded as JWT claims:
+### {
+###   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",
+###   "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."
+### }
+### Backend logs: "IP address embedded in tokens: <your-ip>"
+### Decode at https://jwt.io to see "ipAddress" claim
+### COPY BOTH TOKENS FOR USE BELOW
+
+###
+
+### 1.2 Login as User - GET TOKENS WITH IP CLAIMS
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "user",
+  "password": "user"
+}
+
+### COPY BOTH TOKENS FROM RESPONSE ABOVE FOR USER TESTS
+
+### ===================================
+### STEP 2: PROTECTED ENDPOINT ACCESS WITH IP VALIDATION
+### ===================================
+
+### 2.1 Test Protected Endpoint with Access Token (IP Validation)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK with "welcome to the home page"
+### Backend checks: Token not blacklisted + IP address matches token claim
+### Backend logs: "Token validation successful with IP verification"
+
+###
+
+### 2.2 Test Protected Endpoint with Refresh Token (Should Fail)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_REFRESH_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized (Refresh tokens are not for API calls)
+
+###
+
+### 2.3 Test Protected Endpoint without Token
+GET {{baseUrl}}/api/protected-message
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized
+
+### ===================================
+### STEP 3: STATELESS REFRESH TOKEN FLOW WITH IP VALIDATION
+### ===================================
+
+### 3.1 Get New Tokens Using Refresh Token (Stateless IP Validation)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc1MDUxODU0MiwiZXhwIjoxNzUwNTE5MTQyLCJpcEFkZHJlc3MiOiIxMjcuMC4wLjEiLCJpc3N1ZWRCeSI6ImxlYXJuaW5nIEpXVCB3aXRoIFNwcmluZyBTZWN1cml0eSJ9.4sLfe63o8ReugduTg9la8b_UE-UkeVbwOl4ptP-ft3k"
+}
+
+### Expected: 200 OK with new accessToken AND new refreshToken
+### Backend process (NO DATABASE QUERIES):
+### 1. Extracts IP from refresh token JWT claims
+### 2. Compares with current request IP
+### 3. Blacklists old refresh token (in-memory)
+### 4. Generates new token pair with same IP
+### 5. Returns new tokens
+### Response:
+### {
+###   "accessToken": "eyJhbGciOiJIUzI1NiJ9...",    (NEW 5-minute token)
+###   "refreshToken": "eyJhbGciOiJIUzI1NiJ9..."     (NEW 10-minute token)
+### }
+### Backend logs: "New tokens generated successfully"
+### COPY THE NEW TOKENS FOR CONTINUED USE
+
+###
+
+### 3.2 Use New Access Token from Refresh
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_NEW_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK (proving stateless refresh worked)
+
+###
+
+### 3.3 Try to Use Old Refresh Token (Should Fail - Blacklisted)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "PASTE_OLD_REFRESH_TOKEN_HERE"
+}
+
+### Expected: 500 Internal Server Error "Refresh token is blacklisted"
+### This proves token rotation security works without database
+
+###
+
+### 3.4 Test Refresh with Invalid Token
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "invalid.refresh.token.here"
+}
+
+### Expected: 500 Internal Server Error
+
+### ===================================
+### STEP 4: SIMPLIFIED LOGOUT FUNCTIONALITY
+### ===================================
+
+### 4.1 Login Fresh for Logout Test
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Copy tokens for logout testing
+
+###
+
+### 4.2 Use Access Token Before Logout
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_FRESH_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK (token works before logout)
+
+###
+
+### 4.3 Simplified Logout Process (Stateless)
+POST {{baseUrl}}/api/logout
+Authorization: Bearer PASTE_FRESH_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK
+### Backend process (SIMPLIFIED):
+### 1. Extracts access token from Authorization header
+### 2. Adds access token to blacklist (in-memory)
+### 3. No database operations needed
+### Backend logs: "Access token blacklisted successfully"
+### Backend logs: "Logout completed successfully"
+
+###
+
+### 4.4 Try to Use Access Token After Logout (Should Fail)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_FRESH_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized "Token is blacklisted"
+### This proves blacklist system works
+
+###
+
+### 4.5 Client Should Discard Refresh Token
+### Note: In this stateless approach, clients are responsible for
+### discarding refresh tokens after logout. The token rotation
+### mechanism ensures old tokens become invalid over time.
+
+### ===================================
+### STEP 5: TOKEN EXPIRATION (NO DATABASE DEPENDENCY)
+### ===================================
+
+### 5.1 Generate Tokens for Expiration Test
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Copy tokens and wait 5+ minutes, then test below:
+
+###
+
+### 5.2 Test Expired Access Token (Wait 5+ minutes)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_OLD_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected after 5+ minutes: 401 Unauthorized or 500 Internal Server Error
+### Token expires naturally from JWT claims (no database lookup)
+
+###
+
+### 5.3 Test Expired Refresh Token (Wait 10+ minutes)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "PASTE_OLD_REFRESH_TOKEN_HERE"
+}
+
+### Expected after 10+ minutes: 500 Internal Server Error
+### "Refresh token has expired. Please login again."
+### Expiration checked from JWT claims directly
+
+### ===================================
+### STEP 6: IP ADDRESS VALIDATION FROM JWT CLAIMS
+### ===================================
+
+### 6.1 Login and Check IP in JWT
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### Backend logs: "IP address embedded in tokens: <your-ip>"
+### Decode tokens at https://jwt.io to see "ipAddress" claim
+
+###
+
+### 6.2 Normal API Call (Same IP)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK
+### Backend logs: "Token validation successful with IP verification"
+
+###
+
+### 6.3 Refresh Token Usage (Same IP)
+POST {{baseUrl}}/api/refresh_token
+Content-Type: {{contentType}}
+
+{
+  "refreshToken": "PASTE_REFRESH_TOKEN_HERE"
+}
+
+### Expected: 200 OK (IP from token claim matches current IP)
+### Backend logs: "Token IP address: <ip>" and "Current IP address: <ip>"
+
+###
+
+### 6.4 Simulate IP Mismatch
+### NOTE: This is difficult to test locally, but in production:
+### If someone tries to use a token from a different IP:
+### Expected: 401 Unauthorized "Token validation failed - IP address mismatch"
+### Or: 500 Internal Server Error "Invalid refresh token: IP address mismatch"
+
+### ===================================
+### STEP 7: PERFORMANCE TESTING (NO DATABASE OVERHEAD)
+### ===================================
+
+### 7.1 Multiple Quick API Calls (Performance Test)
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+###
+
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+###
+
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_ACCESS_TOKEN_HERE
+Content-Type: {{contentType}}
+
+### Expected: All return 200 OK quickly
+### Performance should be excellent (no database lookups)
+
+### ===================================
+### STEP 8: BLACKLIST SYSTEM TESTING (IN-MEMORY)
+### ===================================
+
+### 8.1 Login for Blacklist Testing
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+###
+
+### 8.2 Normal Usage
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_TOKEN_FOR_BLACKLIST_TEST_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK
+
+###
+
+### 8.3 Blacklist via Logout
+POST {{baseUrl}}/api/logout
+Authorization: Bearer PASTE_TOKEN_FOR_BLACKLIST_TEST_HERE
+Content-Type: {{contentType}}
+
+### Expected: 200 OK
+### Token now in in-memory blacklist
+
+###
+
+### 8.4 Try Blacklisted Token
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer PASTE_TOKEN_FOR_BLACKLIST_TEST_HERE
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized "Token is blacklisted"
+
+### ===================================
+### STEP 9: JWT CLAIMS INSPECTION
+### ===================================
+
+### 9.1 Generate Token for Inspection
+POST {{baseUrl}}/api/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+### 9.2 Decode Tokens at https://jwt.io
+### Access Token should contain:
+### {
+###   "sub": "admin",
+###   "iat": 1234567890,
+###   "exp": 1234568190,
+###   "roles": ["ROLE_ADMIN"],
+###   "ipAddress": "127.0.0.1",
+###   "issuedBy": "learning JWT with Spring Security"
+### }
+
+### Refresh Token should contain:
+### {
+###   "sub": "admin",
+###   "iat": 1234567890,
+###   "exp": 1234568490,
+###   "ipAddress": "127.0.0.1",
+###   "issuedBy": "learning JWT with Spring Security"
+### }
+
+### ===================================
+### STEP 10: EDGE CASES AND ERROR HANDLING
+### ===================================
+
+### 10.1 Invalid JWT Format
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer invalid.jwt.format
+Content-Type: {{contentType}}
+
+### Expected: 500 Internal Server Error
+
+###
+
+### 10.2 Missing IP Claim (Shouldn't happen with our implementation)
+### This would only occur with manually crafted tokens
+
+###
+
+### 10.3 Empty Authorization Header
+GET {{baseUrl}}/api/protected-message
+Authorization: Bearer
+Content-Type: {{contentType}}
+
+### Expected: 401 Unauthorized
+
+### ===================================
+### EXPECTED RESULTS SUMMARY
+### ===================================
+###
+### LOGIN (/api/login):
+### - Valid credentials: 200 OK with accessToken AND refreshToken
+### - IP address embedded as JWT claims in both tokens
+### - No database storage for refresh tokens
+### - Backend logs IP address in tokens
+###
+### PROTECTED ENDPOINT (/api/protected-message):
+### - With valid access token: 200 OK + "welcome to the home page"
+### - IP validation performed from JWT claims
+### - With blacklisted token: 401 Unauthorized "Token is blacklisted"
+### - With IP mismatch: 401 Unauthorized "Token validation failed"
+### - Without token: 401 Unauthorized
+###
+### REFRESH TOKEN (/api/refresh_token):
+### - With valid refresh token: 200 OK with NEW accessToken AND refreshToken
+### - Stateless operation (no database queries)
+### - IP validation from JWT claims
+### - Old refresh token automatically blacklisted
+### - With blacklisted refresh token: 500 Internal Server Error
+### - With expired refresh token: 500 Internal Server Error
+### - With IP mismatch: 500 Internal Server Error
+###
+### LOGOUT (/api/logout):
+### - With valid access token: 200 OK
+### - Access token added to in-memory blacklist
+### - No database operations
+### - Simplified and fast operation
+###
+### TOKEN CHARACTERISTICS:
+### - Access Token: 5 minutes validity, contains IP claim
+### - Refresh Token: 10 minutes validity, contains IP claim
+### - Blacklist: In-memory ConcurrentHashMap with automatic cleanup
+### - No Database: No refresh token storage in database
+###
+### SECURITY FEATURES:
+### - IP validation from JWT claims (stateless)
+### - Token blacklist system prevents reuse of invalidated tokens
+### - No sensitive data stored in database
+### - Automatic token expiration from JWT claims
+### - Token rotation with blacklist mechanism
+### - Complete logout functionality
+###
+### PERFORMANCE BENEFITS:
+### - No database queries for token validation
+### - Faster response times
+### - Better scalability
+### - Reduced database load
+### - Stateless architecture
+###
+### ===================================
+### TROUBLESHOOTING GUIDE
+### ===================================
+###
+### COMMON ISSUES:
+### 1. "Token is blacklisted" - EXPECTED AFTER LOGOUT
+###    Solution: Login again to get fresh tokens
+###
+### 2. "Token validation failed - IP address mismatch" - SECURITY FEATURE
+###    This happens when request IP doesn't match token IP claim
+###    Solution: Login again from current location
+###
+### 3. "Refresh token has expired" - NATURAL EXPIRATION
+###    Solution: Login again to create new session
+###
+### 4. No database errors - EXPECTED
+###    System is now stateless, no database dependencies for tokens
+###
+### DEBUGGING TIPS:
+### 1. Check backend console logs for IP validation messages
+### 2. Decode JWT tokens at https://jwt.io to inspect claims
+### 3. Look for "ipAddress" claim in token payload
+### 4. Monitor blacklist operations in console logs
+### 5. Verify IP addresses match between token and request
+###
+### IMPROVED STAGE 4 FEATURES:
+### - Fully stateless JWT architecture
+### - IP validation from embedded claims
+### - No database dependencies for tokens
+### - Enhanced performance and scalability
+### - Simplified codebase
+### - Consistent with JWT principles
+### - In-memory blacklist for security
+### - Fast token validation
+###
+### ARCHITECTURAL BENEFITS:
+### - Stateless design enables horizontal scaling
+### - No database bottlenecks for token operations
+### - Faster response times
+### - Simplified deployment and maintenance
+### - Better fault tolerance
+### - Consistent JWT implementation
