@@ -79,7 +79,7 @@ JwtSecurity2024/                    (Parent POM)
 ### הסבר Dependencies:
 
 **JWT Dependencies:**
-- **jjwt** - ליברי ראשי ליצירת ואימות JWT tokens
+- **jjwt** - תלות ראשי ליצירת ואימות JWT tokens
 - **jjwt-api** - ממשקים וDefinitions עבור JWT
 - **jjwt-impl** - המימוש הפנימי של ה-JWT operations
 - **jjwt-jackson** - תמיכה ב-JSON parsing עבור JWT payload

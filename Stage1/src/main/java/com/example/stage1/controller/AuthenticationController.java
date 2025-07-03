@@ -24,8 +24,10 @@ public class AuthenticationController {
     public ResponseEntity<?> authenticateUser(@RequestBody AuthenticationRequest authenticationRequest) {
         try {
             AuthenticationResponse authResponse = authenticationService.authenticate(authenticationRequest);
+
             System.out.println("username: " + authenticationRequest.getUsername());
             System.out.println("jwt token: " + authResponse.getAccessToken());
+
             return ResponseEntity.ok(authResponse);
         } catch (AuthenticationServiceException e) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());

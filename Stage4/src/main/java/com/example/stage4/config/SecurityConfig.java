@@ -43,7 +43,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 // add cors corsConfigurer
                 .cors(cors -> {
-                    // register cors configuration source, React app is running on localhost:3000
+                    // register cors configuration source, React app is running on localhost:5173
                     cors.configurationSource(request -> {
                         var corsConfig = new CorsConfiguration();
                         corsConfig.setAllowedOrigins(List.of("http://localhost:5173")); // vite dev server
