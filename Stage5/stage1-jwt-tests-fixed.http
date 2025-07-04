@@ -1,0 +1,92 @@
+### JWT Authentication API Tests
+### Save this file as: jwt-api-tests.http
+### Use with IntelliJ IDEA Ultimate HTTP Client
+
+### Variables
+@baseUrl = http://localhost:8080
+@contentType = application/json
+
+### ===================================
+### 1. LOGIN TESTS
+### ===================================
+
+### Login with Admin User (Success)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "admin"
+}
+
+
+###
+
+### Login with Regular User (Success)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "user",
+  "password": "user"
+}
+
+
+###
+
+### Login with Invalid Password (Failure)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin",
+  "password": "wrongpassword"
+}
+
+
+###
+
+### Login with Non-existent User (Failure)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "nonexistent",
+  "password": "password"
+}
+
+
+###
+
+### Login with Empty Credentials (Failure)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "",
+  "password": ""
+}
+
+
+###
+
+### Login with Missing Password (Failure)
+POST {{baseUrl}}/login
+Content-Type: {{contentType}}
+
+{
+  "username": "admin"
+}
+
+
+
+### ===================================
+### NOTES FOR TESTING:
+### ===================================
+### 1. Make sure your Spring Boot app is running on localhost:8080
+### 2. The MySQL database should be running and accessible
+### 3. Check application.properties for correct database configuration
+### 4. Initial data (admin/admin, user/user) should be created by DataLoader
+### 5. JWT tokens expire after 5 minutes (300,000 ms)
+### 7. Use the JavaScript test scripts to verify responses automatically
+### 8. Check IntelliJ console for detailed test results and token information
