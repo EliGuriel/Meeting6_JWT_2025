@@ -52,7 +52,7 @@ Content-Type: {{contentType}}
 ###
 
 ### 2.2 Test User Access - PASTE USER TOKEN BELOW
-GET {{baseUrl}}/api/protected-message
+GET {{baseUrl}}/api/protected-message-admin
 Authorization: Bearer PASTE_ADMIN_TOKEN_HERE
 Content-Type: {{contentType}}
 
