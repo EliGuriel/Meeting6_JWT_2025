@@ -15,7 +15,7 @@
 - **JwtAuthenticationFilter** - מעבד tokens בכל בקשה
 - **Token Validation** - בודק תקינות ותפוגה של tokens
 - **Protected Endpoints** - endpoints מוגנים באמת
-- **Authorization Header Processing** - קריאת Bearer tokens
+- **Authorization Header Processing** - קריאת Bearer tokens (נושא) 
 - **Role-based Access Control** - הגבלות על בסיס תפקידים
 - **SecurityContext Management** - ניהול אימות ברמת הבקשה
 
@@ -25,7 +25,7 @@
 
 ```mermaid
 graph TB
-    Client[Client Application<br/>React on localhost:5173]
+    Client[Client Application<br/>]
     
     subgraph SpringBoot["Spring Boot Application - Stage 2"]
         direction TB
@@ -52,7 +52,7 @@ graph TB
         end
     end
     
-    MySQL[(MySQL Database<br/>schema_jwt_2024)]
+    MySQL[(MySQL Database<br/>)]
     
     Client -->|HTTP POST /api/login| JwtFilter
     Client -->|HTTP GET /api/protected-message + Bearer Token| JwtFilter

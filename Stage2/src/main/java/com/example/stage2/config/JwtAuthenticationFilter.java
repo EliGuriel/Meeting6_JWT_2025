@@ -25,83 +25,8 @@ package com.example.stage2.config;
             Filter Logic — doFilterInternal:
             Retrieve the Token: The method checks the Authorization header or query parameter for a token.
     flow:
-+------------------------------------------------+
-|              JwtAuthenticationFilter           |
-+------------------------------------------------+
-                  |
-                  v
-+------------------------------------------------+
-| doFilterInternal(HttpServletRequest,            |
-| HttpServletResponse, FilterChain)               |
-+------------------------------------------------+
-                  |
-                  v
-+------------------------------------------------+
-| Retrieve the Authorization header               |
-| from the request                                |
-+------------------------------------------------+
-                  |
-                  v
-+------------------------------------------------+
-| Is header present and starts with TOKEN_PREFIX? |
-+------------------------------------------------+
-     |                         |
-     | Yes                     | No
-     v                         v
-+------------------------------------------------+
-| Extract token from header                       |
-+------------------------------------------------+
-     |
-     v
-+------------------------------------------------+
-| Alternatively, retrieve the token from          |
-| the request query parameter "token"             |
-+------------------------------------------------+
-                  |
-                  v
-+------------------------------------------------+
-| Is token present?                               |
-+------------------------------------------------+
-     |                         |
-     | Yes                     | No
-     v                         v
-+------------------------------------------------+
-| Extract username from the token using jwtUtil   |
-+------------------------------------------------+
-     |
-     v
-+------------------------------------------------+
-| Load user details using customUserDetailsService|
-| (based on the extracted username)               |
-+------------------------------------------------+
-     |
-     v
-+------------------------------------------------+
-| Validate the token using jwtUtil and            |
-| the loaded user details                         |
-+------------------------------------------------+
-     |
-     v
-+------------------------------------------------+
-| Is token valid?                                 |
-+------------------------------------------------+
-     |                         |
-     | Yes                     | No
-     v                         v
-+------------------------------------------------+
-| Create UsernamePasswordAuthenticationToken and  |
-| set it in SecurityContextHolder                 |
-+------------------------------------------------+
-     |
-     v
-+------------------------------------------------+
-| Pass the request along the filter chain         |
-| (filterChain.doFilter(request, response))       |
-+------------------------------------------------+
 
- */
 
-/*
     TODO Stage 2: Implement the JwtAuthenticationFilter class
  */
 import com.example.stage2.service.CustomUserDetailsService;
@@ -143,40 +68,59 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter{
         String token;
 
         // extract the token from the header if it's present
+        // this is when sending the token in the Authorization header
         if (header != null && header.startsWith(JwtProperties.TOKEN_PREFIX)) {
             token = header.substring(JwtProperties.TOKEN_PREFIX.length());
-        } else {
+        } else
+        // if the header is not present or does not start with the TOKEN_PREFIX,
+        // we will try to get the token from a query parameter
+        {
             // alternatively, try to get the token from a query parameter
             token = request.getParameter("token");
         }
 
-        try {
-            if (token != null) {
-                // extract the username from the token
-                String username = jwtUtil.extractUsername(token);
-                // load user details using the extracted username
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+        // Strict approach: if no token is provided, return 401 Unauthorized
+        if (token == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Missing authentication token");
+            return;
+        }
 
-                // validate the token with the loaded user details
-                if (jwtUtil.validateToken(token, userDetails)) {
-                    // create an authentication object and set it in the Security Context
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+        try {
+            // extract the username from the token
+            String username = jwtUtil.extractUsername(token);
+            // load user details using the extracted username
+            UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+
+            // validate the token with the loaded user details
+            if (jwtUtil.validateToken(token, userDetails)) {
+                // create an authentication object and set it in the Security Context
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                // set the authentication in the SecurityContextHolder
+                /*
+                This is like preforming a login operation,
+                where the user is authenticated and their details are stored in the SecurityContext.
+                 */
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                // If token validation fails, return 401 Unauthorized
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Invalid or expired token");
+                return;
             }
         } catch (UsernameNotFoundException | AuthenticationCredentialsNotFoundException ex) {
             // Return 401 Unauthorized for invalid credentials
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.getWriter().write(ex.getMessage());
             return;
+            // any other exception, such as token expiration or invalid signature,
         } catch (Exception ex) {
             // For other exceptions, return 500 Internal Server Error
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             response.getWriter().write("An error occurred while processing the token");
             return;
         }
-
 
         // pass the request along the filter chain
         filterChain.doFilter(request, response);
