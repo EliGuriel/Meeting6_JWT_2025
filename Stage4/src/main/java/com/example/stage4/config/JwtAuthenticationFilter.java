@@ -17,11 +17,13 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 /**
- * JwtAuthenticationFilter - Enhanced with IP Validation
+ * JwtAuthenticationFilter - Stage 4 Enhanced with Blacklist & IP Validation
  * 
- * This filter processes JWT tokens and validates them including IP address verification.
- * The IP validation ensures that tokens can only be used from the same IP address
- * where they were originally issued, adding an extra layer of security.
+ * This filter processes JWT tokens with the following security features:
+ * - Token blocklist validation (prevents reuse of revoked tokens)
+ * - IP address verification (tokens tied to originating IP)
+ * - Strict authentication approach (requires valid token for protected endpoints)
+ * - Comprehensive error handling with appropriate HTTP status codes
  */
 @RequiredArgsConstructor
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
@@ -30,17 +32,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final CustomUserDetailsService customUserDetailsService;
     private final TokenBlacklistService tokenBlacklistService;
 
-    // This method is used to check if the request should be filtered or not
+    /**
+     * Determines if this filter should be skipped for certain endpoints.
+     * Public endpoints that don't require JWT authentication are excluded.
+     * 
+     * @param request the HTTP request
+     * @return true if the filter should be skipped, false otherwise
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
         String path = request.getRequestURI();
-        return path.equals("/api/login") || path.equals("/api/refresh_token");
+        
+        // FIXED: Use startsWith instead of equals to handle trailing slashes and sub-paths
+        return path.startsWith("/api/login") || 
+               path.startsWith("/api/refresh_token") ||
+               path.startsWith("/api/register") ||
+               path.startsWith("/api/public");
     }
 
     @Override
     protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response, FilterChain filterChain)
+                                    HttpServletResponse response, 
+                                    FilterChain filterChain)
             throws ServletException, IOException {
+        
+        System.out.println("Processing request: " + request.getRequestURI());
+        System.out.println("Request method: " + request.getMethod());
+        System.out.println("Client IP: " + request.getRemoteAddr());
         
         // Retrieve the Authorization header from the request
         String header = request.getHeader(JwtProperties.HEADER_STRING);
@@ -54,40 +72,54 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             token = request.getParameter("token");
         }
 
+        // FIXED: Strict approach - if no token is provided, return 401 Unauthorized
+        // This only applies to protected endpoints (public endpoints are excluded by shouldNotFilter)
+        if (token == null) {
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Missing authentication token");
+            return;
+        }
+
         try {
-            if (token != null) {
-                // Check if the token is blacklisted
-                if (tokenBlacklistService.isBlacklisted(token)) {
-                    System.out.println("Rejected blacklisted token: " + token);
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("Token is blacklisted");
-                    return;
-                }
+            // Step 1: Check if the token is blacklisted
+            if (tokenBlacklistService.isBlacklisted(token)) {
+                System.out.println("Rejected blacklisted token: " + token.substring(0, Math.min(token.length(), 20)) + "...");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token is blacklisted");
+                return;
+            }
 
-                // Extract username and current IP address
-                String username = jwtUtil.extractUsername(token);
-                String currentIpAddress = request.getRemoteAddr();
-                
-                System.out.println("Processing token for user: " + username);
-                System.out.println("Request from IP: " + currentIpAddress);
-                
-                // Load user details using the extracted username
-                UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+            // Step 2: Extract username and current IP address
+            String username = jwtUtil.extractUsername(token);
+            String currentIpAddress = request.getRemoteAddr();
+            
+            System.out.println("Processing token for user: " + username);
+            System.out.println("Request from IP: " + currentIpAddress);
+            
+            // Step 3: Load user details using the extracted username
+            UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
 
-                // Validate the token with IP address verification
-                if (jwtUtil.validateToken(token, userDetails, currentIpAddress)) {
-                    System.out.println("Token validation successful with IP verification");
-                    
-                    // Create an authentication object and set it in the Security Context
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                } else {
-                    System.out.println("Token validation failed - possible IP mismatch");
-                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                    response.getWriter().write("Token validation failed - IP address mismatch");
-                    return;
-                }
+            // FIXED: Additional check - ensure userDetails is not null 
+            // (CustomUserDetailsService should throw exception, but adding safety check)
+            if (userDetails == null) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("User not found or account disabled");
+                return;
+            }
+
+            // Step 4: Validate the token with IP address verification
+            if (jwtUtil.validateToken(token, userDetails, currentIpAddress)) {
+                System.out.println("Token validation successful with IP verification");
+                
+                // Create an authentication object and set it in the Security Context
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(authentication);
+            } else {
+                System.out.println("Token validation failed - possible IP mismatch or token invalid");
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.getWriter().write("Token validation failed - IP address mismatch or invalid token");
+                return;
             }
         } catch (UsernameNotFoundException | AuthenticationCredentialsNotFoundException ex) {
             System.out.println("Authentication error: " + ex.getMessage());

@@ -47,7 +47,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         } else {
            // throw new UsernameNotFoundException("Invalid username or password.");
             System.out.println("Invalid username or password, or logout out.");
-            return null;
+            throw new UsernameNotFoundException("Invalid username: " + username);
         }
     }
 

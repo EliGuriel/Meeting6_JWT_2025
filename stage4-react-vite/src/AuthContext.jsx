@@ -33,7 +33,7 @@ export const AuthProvider = ({ children }) => {
             try {
                 const decodedToken = jwtDecode(storedAccessToken);
 
-                // בדוק אם הטוקן עדיין תקף
+                // check if the token is still valid
                 if (decodedToken.exp * 1000 > Date.now()) {
                     setAccessToken(storedAccessToken);
                     setRefreshToken(storedRefreshToken);
@@ -51,7 +51,7 @@ export const AuthProvider = ({ children }) => {
             }
         }
         setLoading(false);
-    }, []); // רק פעם אחת בטעינה
+    }, []); // only run once on mount
 
     const login = async (username, password) => {
         console.log('Login attempt for username:', username);
@@ -103,7 +103,7 @@ export const AuthProvider = ({ children }) => {
         try {
             console.log('Calling refresh token endpoint with token:', refreshTokenToUse ? 'Token exists' : 'No token');
 
-            const response = await fetch('http://localhost:8080/api/refresh_token', {  // תיקון: ודא שזה refresh_token לא login
+            const response = await fetch('http://localhost:8080/api/refresh_token', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ refreshToken: refreshTokenToUse }),
@@ -127,12 +127,12 @@ export const AuthProvider = ({ children }) => {
             } else {
                 const errorText = await response.text();
                 console.error('Refresh failed with status:', response.status, 'Error:', errorText);
-                logout();
+                await logout();
                 return null;
             }
         } catch (error) {
             console.error('Refresh token error:', error);
-            logout();
+            await logout();
             return null;
         }
     };
@@ -163,7 +163,7 @@ export const AuthProvider = ({ children }) => {
 
         if (!accessToken || !user) {
             console.log('No access token or user, redirecting to login');
-            logout();
+            await logout();
             throw new Error('No authentication data');
         }
 
@@ -179,16 +179,16 @@ export const AuthProvider = ({ children }) => {
 
             if (!refreshToken) {
                 console.log('No refresh token available');
-                logout();
+                await logout();
                 throw new Error('No refresh token available');
             }
 
             try {
-                // בדוק שגם הRefresh token לא פג
+                // check if the refresh token is valid
                 const refreshDecoded = jwtDecode(refreshToken);
                 if (refreshDecoded.exp * 1000 <= Date.now()) {
                     console.log('Refresh token expired, logging out...');
-                    logout();
+                    await logout();
                     throw new Error('Refresh token expired');
                 }
 
@@ -198,22 +198,22 @@ export const AuthProvider = ({ children }) => {
                     throw new Error('Token refresh failed');
                 }
 
-                // השתמש בטוקן החדש לבקשה הזו
+                // use the new access token for this request
                 options.headers = {
                     ...options.headers,
                     'Authorization': `Bearer ${newAccessToken}`,
                 };
             } catch (refreshError) {
                 console.error('Refresh error:', refreshError);
-                logout();
+                await logout();
                 throw new Error('Session expired');
             }
         } else if (timeUntilExpiry <= 0) {
             console.log('Token already expired');
-            logout();
+            await logout();
             throw new Error('Token expired');
         } else {
-            // השתמש בטוקן הנוכחי
+            // use the current access token
             options.headers = {
                 ...options.headers,
                 'Authorization': `Bearer ${accessToken}`,

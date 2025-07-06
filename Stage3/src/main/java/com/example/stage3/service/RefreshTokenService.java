@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class RefreshTokenService {
-    final private UserRepository userRepository;
     final private CustomUserDetailsService customUserDetailsService;
     final private JwtUtil jwtUtil;
 
